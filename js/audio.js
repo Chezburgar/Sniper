@@ -39,8 +39,8 @@ class SfxEngine {
     return g;
   }
 
-  _noise(dest, dur, { f0 = 1000, f1 = null, q = 1, type = 'bandpass', a = 0.002, peak = 1 } = {}) {
-    const t = this.ctx.currentTime;
+  _noise(dest, dur, { f0 = 1000, f1 = null, q = 1, type = 'bandpass', a = 0.002, peak = 1, delay = 0 } = {}) {
+    const t = this.ctx.currentTime + delay;
     const src = this.ctx.createBufferSource();
     src.buffer = this._noiseBuf;
     src.loop = true;
@@ -222,6 +222,119 @@ class SfxEngine {
     const o = this._out(0.5);
     this._tone(o, 0.1, { f0: 70, f1: 45, type: 'sine', peak: 0.8 });
     this._tone(o, 0.09, { f0: 62, f1: 42, type: 'sine', peak: 0.6, delay: 0.16 });
+  }
+
+  // ================= menu music (fully synthesized ambient loop) =================
+  setMusicVolume(v) {
+    this.musicVolume = v;
+    if (this.musicGain && this.musicPlaying) {
+      this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicGain.gain.setTargetAtTime(v * 0.55, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  startMusic() {
+    if (!this.ctx || this.musicPlaying) return;
+    if (this.musicVolume === undefined) this.musicVolume = 0.5;
+    this.musicPlaying = true;
+    const ctx = this.ctx;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(this.musicVolume * 0.55, ctx.currentTime + 2.5);
+    g.connect(this.master);
+    this.musicGain = g;
+    this._musicNodes = [];
+
+    // low drone: two detuned saws through a dark lowpass
+    const droneG = ctx.createGain(); droneG.gain.value = 0.12;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 240; lp.Q.value = 0.6;
+    for (const f of [55, 55.4, 110.3]) {
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
+      const og = ctx.createGain(); og.gain.value = f > 100 ? 0.25 : 0.55;
+      o.connect(og); og.connect(lp); o.start();
+      this._musicNodes.push(o);
+    }
+    lp.connect(droneG); droneG.connect(g);
+
+    // scheduler: eighth notes at ~68 bpm
+    const beat8 = (60 / 68) / 2;
+    this._musicStep = 0;
+    this._musicNext = ctx.currentTime + 0.2;
+    this._musicTimer = setInterval(() => {
+      if (!this.musicPlaying) return;
+      while (this._musicNext < ctx.currentTime + 1.4) {
+        this._schedStep(this._musicNext);
+        this._musicNext += beat8;
+        this._musicStep++;
+      }
+    }, 300);
+  }
+
+  _schedStep(t) {
+    const g = this.musicGain, s = this._musicStep;
+    const delay = Math.max(0, t - this.ctx.currentTime);
+    const bar = Math.floor(s / 16);
+    const beat8 = s % 16;
+
+    // soft low pulse on each bar
+    if (beat8 === 0) this._tone(g, 0.6, { f0: 55, f1: 41, type: 'sine', peak: 0.5, a: 0.01, delay });
+
+    // pad chord every 2 bars: Em -> D -> C -> B (phrygian cadence)
+    if (s % 32 === 0) {
+      const chords = [
+        [164.81, 246.94, 329.63], [146.83, 220.0, 293.66],
+        [130.81, 196.0, 261.63], [123.47, 185.0, 246.94]];
+      for (const f of chords[(bar >> 1) % 4]) {
+        this._tone(g, 3.6, { f0: f, type: 'triangle', peak: 0.045, a: 1.4, delay });
+        this._tone(g, 3.6, { f0: f * 1.003, type: 'triangle', peak: 0.03, a: 1.6, delay });
+      }
+    }
+
+    // sparse melody: E phrygian dominant, breathy sine with vibrato + echo
+    if (beat8 % 4 === 2 && Math.random() < 0.5) {
+      const scale = [329.63, 349.23, 415.30, 440.0, 493.88, 523.25, 587.33, 659.26];
+      const f = scale[Math.floor(Math.random() * scale.length)];
+      this._melNote(t, f, 1.1, 0.06);
+      this._melNote(t + 0.42, f, 0.9, 0.022); // echo
+      if (Math.random() < 0.3) this._melNote(t + 0.84, f * (Math.random() < 0.5 ? 0.749 : 1.0), 0.8, 0.012);
+    }
+
+    // faint shaker on offbeats
+    if (beat8 % 2 === 1 && Math.random() < 0.35) {
+      this._noise(g, 0.05, { f0: 5200, q: 1.5, peak: 0.05, a: 0.004, delay });
+    }
+  }
+
+  _melNote(t, f, dur, peak) {
+    const ctx = this.ctx, g = this.musicGain;
+    if (t < ctx.currentTime) t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(f, t);
+    const vib = ctx.createOscillator(); vib.frequency.value = 5.2;
+    const vibG = ctx.createGain(); vibG.gain.value = f * 0.008;
+    vib.connect(vibG); vibG.connect(o.frequency);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(peak, t + 0.12);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(ng); ng.connect(g);
+    o.start(t); vib.start(t);
+    o.stop(t + dur + 0.1); vib.stop(t + dur + 0.1);
+  }
+
+  stopMusic() {
+    if (!this.musicPlaying) return;
+    this.musicPlaying = false;
+    clearInterval(this._musicTimer);
+    const g = this.musicGain, nodes = this._musicNodes || [];
+    if (g) {
+      g.gain.cancelScheduledValues(this.ctx.currentTime);
+      g.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.35);
+    }
+    setTimeout(() => {
+      nodes.forEach(n => { try { n.stop(); } catch (e) { /* already stopped */ } });
+      if (g) g.disconnect();
+    }, 1600);
+    this.musicGain = null;
   }
 
   _startWind() { // desert ambience: filtered noise, slowly breathing

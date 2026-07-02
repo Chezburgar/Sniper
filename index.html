@@ -10,7 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='none' stroke='%23e8b44a' stroke-width='6'/><line x1='50' y1='6' x2='50' y2='94' stroke='%23e8b44a' stroke-width='5'/><line x1='6' y1='50' x2='94' y2='50' stroke='%23e8b44a' stroke-width='5'/></svg>">
 <style>
 :root{
-  --gold:#e8b44a; --gold-dim:#a8823a; --ink:#0c0f12; --panel:rgba(10,13,16,.82);
+  --gold:#e8b44a; --gold-dim:#a8823a; --goldA:232,180,74; --ink:#0c0f12; --panel:rgba(10,13,16,.82);
   --red:#e2493b; --green:#7fc95c; --text:#e8e2d4;
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -21,21 +21,21 @@ canvas#game{position:fixed;inset:0;display:block}
 /* ============ MENU ============ */
 #menu{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;
   background:linear-gradient(180deg,rgba(8,10,13,.45),rgba(8,10,13,.72) 70%,rgba(8,10,13,.92));}
-#menu .panel{width:min(430px,92vw);background:var(--panel);border:1px solid rgba(232,180,74,.35);
+#menu .panel{width:min(430px,92vw);background:var(--panel);border:1px solid rgba(var(--goldA),.35);
   border-radius:10px;padding:34px 38px;backdrop-filter:blur(10px);box-shadow:0 30px 80px rgba(0,0,0,.6)}
 h1{font-family:'Chakra Petch',sans-serif;font-size:44px;letter-spacing:8px;color:var(--gold);
-  text-align:center;text-shadow:0 0 30px rgba(232,180,74,.35);line-height:1}
+  text-align:center;text-shadow:0 0 30px rgba(var(--goldA),.35);line-height:1}
 .sub{ text-align:center;font-size:14px;letter-spacing:5px;color:#9a927e;margin:6px 0 26px;text-transform:uppercase}
 label{display:block;font-size:12px;letter-spacing:2.5px;color:#9a927e;text-transform:uppercase;margin:14px 0 5px}
-input[type=text]{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(232,180,74,.25);border-radius:6px;
+input[type=text]{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(var(--goldA),.25);border-radius:6px;
   color:var(--text);font-family:'Chakra Petch';font-size:17px;letter-spacing:2px;padding:10px 13px;outline:none;text-transform:uppercase}
 input[type=text]:focus{border-color:var(--gold)}
 input[type=range]{width:100%;accent-color:var(--gold)}
 .btn{display:block;width:100%;margin-top:12px;padding:13px;border-radius:6px;border:1px solid var(--gold-dim);
-  background:linear-gradient(180deg,rgba(232,180,74,.16),rgba(232,180,74,.05));color:var(--gold);
+  background:linear-gradient(180deg,rgba(var(--goldA),.16),rgba(var(--goldA),.05));color:var(--gold);
   font-family:'Chakra Petch';font-size:16px;letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:.15s}
-.btn:hover{background:linear-gradient(180deg,rgba(232,180,74,.34),rgba(232,180,74,.12));box-shadow:0 0 22px rgba(232,180,74,.25)}
-.btn.primary{background:linear-gradient(180deg,#e8b44a,#c2903a);color:#191204;font-weight:700}
+.btn:hover{background:linear-gradient(180deg,rgba(var(--goldA),.34),rgba(var(--goldA),.12));box-shadow:0 0 22px rgba(var(--goldA),.25)}
+.btn.primary{background:linear-gradient(180deg,var(--gold),var(--gold-dim));color:#191204;font-weight:700}
 .btn.primary:hover{filter:brightness(1.1)}
 .btn.ghost{border-color:rgba(255,255,255,.18);color:#c8c2b2}
 .row{display:flex;gap:10px}
@@ -77,10 +77,10 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 .kf{background:rgba(8,10,13,.72);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:5px 12px;
   font-size:14.5px;letter-spacing:.5px;animation:kfin .25s ease-out}
 .kf .k{color:var(--gold);font-weight:700}.kf .v{color:#d0cabb;font-weight:700}.kf .hs{color:#ffcf3f}
-.kf.me{border-color:rgba(232,180,74,.55)}
+.kf.me{border-color:rgba(var(--goldA),.55)}
 @keyframes kfin{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
 
-#roomChip{position:fixed;top:22px;left:24px;background:rgba(8,10,13,.72);border:1px solid rgba(232,180,74,.4);
+#roomChip{position:fixed;top:22px;left:24px;background:rgba(8,10,13,.72);border:1px solid rgba(var(--goldA),.4);
   border-radius:6px;padding:7px 14px;font-size:14px;letter-spacing:2px;color:#b7b09d;pointer-events:auto;cursor:pointer}
 #roomChip b{color:var(--gold);font-family:'Chakra Petch';font-size:16px}
 #pingChip{position:fixed;top:64px;left:24px;font-size:12.5px;letter-spacing:2px;color:#7d7767}
@@ -96,7 +96,9 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 #scope .hl,#scope .vl{position:absolute;background:rgba(10,12,10,.92)}
 #scope .hl{left:calc(50% - 36vmin);top:calc(50% - .75px);width:72vmin;height:1.5px}
 #scope .vl{top:calc(50% - 36vmin);left:calc(50% - .75px);height:72vmin;width:1.5px}
-#scope .dotc{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:rgba(200,30,30,.9);box-shadow:0 0 6px rgba(200,30,30,.6)}
+#scope .dotc{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:var(--ret,#e02020);box-shadow:0 0 6px var(--ret,#e02020)}
+#scope.ret-dot .hl,#scope.ret-dot .vl,#scope.ret-dot .mil{display:none}
+#scope.ret-post .vl{display:none}
 #scope .mil{position:absolute;left:50%;top:calc(50% + 6vmin);width:1.5px;height:14vmin;transform:translateX(-50%);
   background:repeating-linear-gradient(180deg,rgba(10,12,10,.9) 0 1.5px,transparent 1.5px 3.5vmin)}
 #breath{position:fixed;left:50%;bottom:12%;transform:translateX(-50%);font-size:13px;letter-spacing:3px;color:rgba(232,226,212,.75);display:none}
@@ -110,7 +112,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 #respawnIn{margin-top:26px;font-family:'Chakra Petch';font-size:22px;letter-spacing:3px;color:var(--text)}
 
 #scoreboard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);min-width:460px;display:none;
-  background:rgba(8,10,13,.88);border:1px solid rgba(232,180,74,.4);border-radius:10px;padding:22px 26px;backdrop-filter:blur(6px)}
+  background:rgba(8,10,13,.88);border:1px solid rgba(var(--goldA),.4);border-radius:10px;padding:22px 26px;backdrop-filter:blur(6px)}
 #scoreboard h3{font-family:'Chakra Petch';letter-spacing:4px;color:var(--gold);font-size:19px;margin-bottom:12px;text-align:center}
 #scoreboard table{width:100%;border-collapse:collapse;font-size:16px}
 #scoreboard th{font-size:12px;letter-spacing:2px;color:#9a927e;text-align:left;padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.12)}
@@ -123,8 +125,32 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 #pauseOverlay h2{font-family:'Chakra Petch';font-size:30px;letter-spacing:6px;color:var(--gold)}
 #pauseOverlay p{margin-top:12px;font-size:16px;letter-spacing:1.5px;color:#c8c2b2}
 #pauseOverlay .btn{width:240px;pointer-events:auto}
-#toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(8,10,13,.85);border:1px solid rgba(232,180,74,.4);
+#toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(8,10,13,.85);border:1px solid rgba(var(--goldA),.4);
   border-radius:6px;padding:8px 18px;font-size:15px;letter-spacing:1px;color:var(--text);opacity:0;transition:opacity .25s}
+
+/* ============ MENU TABS / LOADOUT / BINDS ============ */
+.tabs{display:flex;gap:6px;margin-bottom:16px}
+.tabbtn{flex:1;padding:8px 2px;background:transparent;border:1px solid rgba(255,255,255,.14);border-radius:5px;
+  color:#9a927e;font-family:'Chakra Petch';font-size:12px;letter-spacing:1.2px;cursor:pointer;transition:.15s}
+.tabbtn:hover{color:var(--text)}
+.tabbtn.active{border-color:var(--gold);color:var(--gold);background:rgba(var(--goldA),.08)}
+.tabpage{min-height:272px}
+.swatchRow{display:flex;gap:16px;flex-wrap:wrap;margin:6px 2px 30px}
+.swatch{width:46px;height:30px;border-radius:5px;border:2px solid rgba(255,255,255,.18);cursor:pointer;transition:.12s;position:relative}
+.swatch:hover{border-color:rgba(255,255,255,.5)}
+.swatch.sel{border-color:var(--gold);box-shadow:0 0 10px rgba(var(--goldA),.4)}
+.swatch small{position:absolute;left:50%;top:32px;transform:translateX(-50%);font-size:9px;letter-spacing:.4px;color:#9a927e;white-space:nowrap;font-family:'Rajdhani'}
+.optRow{display:flex;gap:8px;margin:6px 0 4px}
+.optbtn{flex:1;padding:8px 4px;background:transparent;border:1px solid rgba(255,255,255,.16);border-radius:5px;
+  color:#c8c2b2;font-family:'Chakra Petch';font-size:11.5px;letter-spacing:1px;cursor:pointer}
+.optbtn.sel{border-color:var(--gold);color:var(--gold)}
+.bindrow{display:flex;justify-content:space-between;align-items:center;padding:4.5px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.bindrow .bl{font-size:13.5px;letter-spacing:1px;color:#c8c2b2}
+.keybtn{min-width:100px;padding:5px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.2);border-radius:5px;
+  color:var(--text);font-family:'Chakra Petch';font-size:12.5px;letter-spacing:1px;cursor:pointer;text-align:center}
+.keybtn:hover{border-color:var(--gold)}
+.keybtn.listening{border-color:var(--gold);color:var(--gold);animation:pulse .9s infinite}
+@keyframes pulse{50%{opacity:.45}}
 </style>
 </head>
 <body>
@@ -175,23 +201,49 @@ input[type=range]{width:100%;accent-color:var(--gold)}
   <div class="panel">
     <h1>LONGSHOT</h1>
     <div class="sub">online sniper duels</div>
-    <label>Callsign</label>
-    <input type="text" id="nameInput" maxlength="14" placeholder="GHOST-1" autocomplete="off">
-    <button class="btn primary" id="hostBtn">HOST MATCH</button>
-    <div class="row">
-      <input type="text" id="codeInput" maxlength="5" placeholder="CODE" style="flex:1" autocomplete="off">
-      <button class="btn" id="joinBtn" style="flex:1.4">JOIN MATCH</button>
+    <div class="tabs">
+      <button class="tabbtn active" data-tab="play">PLAY</button>
+      <button class="tabbtn" data-tab="loadout">LOADOUT</button>
+      <button class="tabbtn" data-tab="controls">CONTROLS</button>
+      <button class="tabbtn" data-tab="settings">SETTINGS</button>
     </div>
-    <button class="btn ghost" id="practiceBtn">PRACTICE RANGE (VS BOTS)</button>
-    <div class="settings">
-      <div><label>Sensitivity <span id="sensVal">1.0</span></label><input type="range" id="sensInput" min="0.2" max="3" step="0.1" value="1"></div>
-      <div><label>Volume <span id="volVal">80%</span></label><input type="range" id="volInput" min="0" max="100" step="5" value="80"></div>
+    <div class="tabpage" id="tab-play">
+      <label>Callsign</label>
+      <input type="text" id="nameInput" maxlength="14" placeholder="GHOST-1" autocomplete="off">
+      <button class="btn primary" id="hostBtn">HOST MATCH</button>
+      <div class="row">
+        <input type="text" id="codeInput" maxlength="5" placeholder="CODE" style="flex:1" autocomplete="off">
+        <button class="btn" id="joinBtn" style="flex:1.4">JOIN MATCH</button>
+      </div>
+      <button class="btn ghost" id="practiceBtn">PRACTICE RANGE (VS BOTS)</button>
+    </div>
+    <div class="tabpage hidden" id="tab-loadout">
+      <label>Rifle finish</label>
+      <div class="swatchRow" id="finishRow"></div>
+      <label>Reticle style</label>
+      <div class="optRow" id="reticleRow"></div>
+      <label style="margin-top:18px">Reticle color</label>
+      <div class="swatchRow" id="retColorRow"></div>
+    </div>
+    <div class="tabpage hidden" id="tab-controls">
+      <div id="bindList"></div>
+      <button class="btn ghost" id="resetBinds" style="margin-top:14px">RESET TO DEFAULTS</button>
+    </div>
+    <div class="tabpage hidden" id="tab-settings">
+      <label>Sensitivity <span id="sensVal">1.0</span></label>
+      <input type="range" id="sensInput" min="0.2" max="3" step="0.1" value="1">
+      <label>SFX volume <span id="volVal">80%</span></label>
+      <input type="range" id="volInput" min="0" max="100" step="5" value="80">
+      <label>Music volume <span id="musVal">50%</span></label>
+      <input type="range" id="musInput" min="0" max="100" step="5" value="50">
+      <label>Menu theme</label>
+      <div class="swatchRow" id="themeRow"></div>
     </div>
     <div id="menuStatus"></div>
   </div>
 </div>
 <div class="controls-hint" id="menuHint"><b>WASD</b> move &nbsp;·&nbsp; <b>RMB</b> scope &nbsp;·&nbsp; <b>LMB</b> fire &nbsp;·&nbsp; <b>SHIFT</b> hold breath / sprint &nbsp;·&nbsp; <b>R</b> reload &nbsp;·&nbsp; <b>C</b> crouch &nbsp;·&nbsp; <b>SPACE</b> jump</div>
-<div class="credit">LONGSHOT v1.0</div>
+<div class="credit">LONGSHOT v1.1</div>
 <div id="toast"></div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>

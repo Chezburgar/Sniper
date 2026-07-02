@@ -1,7 +1,7 @@
 // LONGSHOT — online multiplayer sniper PvP.
 import * as THREE from 'three';
 import { buildMap } from './map.js';
-import { createSoldier, createRifle, animateSoldier, PLAYER_COLORS } from './playermodel.js';
+import { createSoldier, createRifle, animateSoldier, PLAYER_COLORS, RIFLE_FINISHES } from './playermodel.js';
 import { SFX } from './audio.js';
 import { Net, makeRoomCode } from './net.js';
 
@@ -15,7 +15,48 @@ const store = {
   set sens(v) { localStorage.setItem('ls_sens', v); },
   get vol() { return parseFloat(localStorage.getItem('ls_vol') || '0.8'); },
   set vol(v) { localStorage.setItem('ls_vol', v); },
+  get music() { return parseFloat(localStorage.getItem('ls_music') || '0.5'); },
+  set music(v) { localStorage.setItem('ls_music', v); },
+  get skin() { return parseInt(localStorage.getItem('ls_skin') || '0'); },
+  set skin(v) { localStorage.setItem('ls_skin', v); },
+  get reticle() { return localStorage.getItem('ls_reticle') || 'cross'; },
+  set reticle(v) { localStorage.setItem('ls_reticle', v); },
+  get retColor() { return localStorage.getItem('ls_retcolor') || '#e02020'; },
+  set retColor(v) { localStorage.setItem('ls_retcolor', v); },
+  get theme() { return localStorage.getItem('ls_theme') || 'gold'; },
+  set theme(v) { localStorage.setItem('ls_theme', v); },
+  get binds() { try { return JSON.parse(localStorage.getItem('ls_binds')) || {}; } catch (e) { return {}; } },
+  set binds(v) { localStorage.setItem('ls_binds', JSON.stringify(v)); },
 };
+
+// ---------------------------------------------------------------- keybinds
+const BIND_ACTIONS = [
+  ['forward', 'Move forward', 'KeyW'],
+  ['back', 'Move back', 'KeyS'],
+  ['left', 'Strafe left', 'KeyA'],
+  ['right', 'Strafe right', 'KeyD'],
+  ['jump', 'Jump', 'Space'],
+  ['crouch', 'Crouch (toggle)', 'KeyC'],
+  ['sprint', 'Sprint / Hold breath', 'ShiftLeft'],
+  ['reload', 'Reload', 'KeyR'],
+  ['scoreboard', 'Scoreboard', 'Tab'],
+];
+const DEFAULT_BINDS = Object.fromEntries(BIND_ACTIONS.map(([a, , c]) => [a, c]));
+let binds = { ...DEFAULT_BINDS, ...store.binds };
+let bindListening = null;
+const dn = (action) => !!keys[binds[action]];
+
+function prettyKey(code) {
+  if (!code) return '—';
+  return code
+    .replace(/^Key/, '').replace(/^Digit/, '')
+    .replace('ShiftLeft', 'L-SHIFT').replace('ShiftRight', 'R-SHIFT')
+    .replace('ControlLeft', 'L-CTRL').replace('ControlRight', 'R-CTRL')
+    .replace('AltLeft', 'L-ALT').replace('AltRight', 'R-ALT')
+    .replace('ArrowUp', '↑').replace('ArrowDown', '↓')
+    .replace('ArrowLeft', '←').replace('ArrowRight', '→')
+    .toUpperCase();
+}
 
 // ---------------------------------------------------------------- constants
 const GRAV = 19, WALK = 4.6, SPRINT = 6.8, CROUCH_SPD = 2.1, SCOPED_SPD = 1.8;
@@ -50,13 +91,18 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// first-person viewmodel rifle
+// first-person viewmodel rifle (rebuilt when the finish changes)
 const viewmodel = new THREE.Group();
-const fpRifle = createRifle();
-fpRifle.traverse(o => { o.castShadow = false; });
-fpRifle.position.set(0.26, -0.24, -0.45);
-fpRifle.rotation.y = 0.03;
-viewmodel.add(fpRifle);
+let fpRifle = null;
+function mountViewRifle(finishIdx) {
+  if (fpRifle) viewmodel.remove(fpRifle);
+  fpRifle = createRifle(finishIdx);
+  fpRifle.traverse(o => { o.castShadow = false; });
+  fpRifle.position.set(0.26, -0.24, -0.45);
+  fpRifle.rotation.y = 0.03;
+  viewmodel.add(fpRifle);
+}
+mountViewRifle(store.skin);
 camera.add(viewmodel);
 scene.add(camera);
 
@@ -211,16 +257,16 @@ const player = {
   dead: false, deadT: 0, boltT: 0, reloadT: 0,
   scoped: false, scopeT: 0, breath: 1, holdingBreath: false,
   recoil: 0, lastDamageT: -99, spawnProtT: 0,
-  stepT: 0, sendT: 0, walkT: 0,
+  stepT: 0, sendT: 0, walkT: 0, viewY: 0,
 };
 
 const keys = {};
 let time = 0;
 
 // ---------------------------------------------------------------- remotes
-function createRemote(id, name, colorIdx) {
+function createRemote(id, name, colorIdx, skin = 0) {
   if (remotes.has(id) || id === myId) return;
-  const { group, refs } = createSoldier(PLAYER_COLORS[colorIdx % PLAYER_COLORS.length], name);
+  const { group, refs } = createSoldier(PLAYER_COLORS[colorIdx % PLAYER_COLORS.length], name, skin);
   group.visible = false;
   scene.add(group);
   remotes.set(id, {
@@ -366,13 +412,14 @@ function onNetData(msg, fromPeerJsId) {
       const colorIdx = (nextColorIdx++) % PLAYER_COLORS.length;
       peerToPlayer.set(fromPeerJsId, pid);
       const name = String(msg.name || 'GHOST').slice(0, 14) || 'GHOST';
-      players.set(pid, { id: pid, name, colorIdx, kills: 0, deaths: 0 });
+      const skin = (msg.skin | 0) % RIFLE_FINISHES.length;
+      players.set(pid, { id: pid, name, colorIdx, skin, kills: 0, deaths: 0 });
       net.sendTo(fromPeerJsId, {
         t: 'welcome', id: pid, colorIdx,
-        roster: [...players.values()].map(p => ({ id: p.id, name: p.name, colorIdx: p.colorIdx, kills: p.kills, deaths: p.deaths })),
+        roster: [...players.values()].map(p => ({ id: p.id, name: p.name, colorIdx: p.colorIdx, skin: p.skin || 0, kills: p.kills, deaths: p.deaths })),
       });
-      net.relay({ t: 'join', p: { id: pid, name, colorIdx } }, fromPeerJsId);
-      createRemote(pid, name, colorIdx);
+      net.relay({ t: 'join', p: { id: pid, name, colorIdx, skin } }, fromPeerJsId);
+      createRemote(pid, name, colorIdx, skin);
       toast(name + ' joined the match');
       setCenterMsg('', '');
       updateScoreboard();
@@ -380,7 +427,7 @@ function onNetData(msg, fromPeerJsId) {
     }
     case 'join': {
       players.set(msg.p.id, { ...msg.p, kills: 0, deaths: 0 });
-      createRemote(msg.p.id, msg.p.name, msg.p.colorIdx);
+      createRemote(msg.p.id, msg.p.name, msg.p.colorIdx, msg.p.skin);
       toast(msg.p.name + ' joined the match');
       updateScoreboard();
       break;
@@ -529,6 +576,7 @@ function dieLocal(killerId, headshot) {
 function respawn() {
   const spawn = pickSpawn();
   player.pos.copy(spawn);
+  player.viewY = spawn.y;
   player.vel.set(0, 0, 0);
   player.hp = 100; player.mag = MAG_SIZE; player.reserve = RESERVE_START;
   player.dead = false; player.boltT = 0; player.reloadT = 0;
@@ -658,9 +706,9 @@ function updatePlayer(dt) {
   }
 
   // movement input
-  const fwd = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
-  const strafe = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
-  const sprinting = keys['ShiftLeft'] && fwd > 0 && !player.scoped && !player.crouch;
+  const fwd = (dn('forward') ? 1 : 0) - (dn('back') ? 1 : 0);
+  const strafe = (dn('right') ? 1 : 0) - (dn('left') ? 1 : 0);
+  const sprinting = dn('sprint') && fwd > 0 && !player.scoped && !player.crouch;
   let speed = player.scoped ? SCOPED_SPD : player.crouch ? CROUCH_SPD : sprinting ? SPRINT : WALK;
 
   const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
@@ -672,7 +720,7 @@ function updatePlayer(dt) {
   player.vel.z = mz * speed;
 
   // jump & gravity
-  if (keys['Space'] && player.grounded && !player.scoped) {
+  if (dn('jump') && player.grounded && !player.scoped) {
     player.vel.y = JUMP;
     player.grounded = false;
   }
@@ -696,10 +744,17 @@ function updatePlayer(dt) {
   // recoil recovery
   player.recoil = Math.max(0, player.recoil - dt * 0.35);
 
-  // camera
+  // camera — the eye height is smoothed so stairs feel like a ramp, not jolts
+  if (player.grounded) {
+    const dy = player.pos.y - player.viewY;
+    if (Math.abs(dy) > 1.6) player.viewY = player.pos.y;
+    else player.viewY += dy * Math.min(1, dt * 13);
+  } else {
+    player.viewY = player.pos.y; // airborne: track exactly
+  }
   const eye = player.crouch ? EYE_CROUCH : EYE_STAND;
   const bob = player.grounded && hSpeed > 0.5 ? Math.sin(player.walkT * 2.2) * 0.03 * Math.min(1, hSpeed / WALK) : 0;
-  camera.position.set(player.pos.x, player.pos.y + eye + bob, player.pos.z);
+  camera.position.set(player.pos.x, player.viewY + eye + bob, player.pos.z);
 
   // scope sway
   let swayY = 0, swayP = 0;
@@ -829,7 +884,7 @@ function spawnBots() {
   for (let i = 0; i < 5; i++) {
     const id = 'bot' + i;
     const colorIdx = (i + 1) % PLAYER_COLORS.length;
-    const { group, refs } = createSoldier(PLAYER_COLORS[colorIdx], BOT_NAMES[i]);
+    const { group, refs } = createSoldier(PLAYER_COLORS[colorIdx], BOT_NAMES[i], (i + 1) % RIFLE_FINISHES.length);
     scene.add(group);
     const spawn = map.spawns[(i * 3 + 4) % map.spawns.length].clone();
     players.set(id, { id, name: BOT_NAMES[i], colorIdx, kills: 0, deaths: 0 });
@@ -951,8 +1006,9 @@ function clearBots() {
 function startMatch({ isPractice }) {
   practice = isPractice;
   mode = 'playing';
+  SFX.stopMusic();
   players.clear();
-  players.set(myId, { id: myId, name: myName, colorIdx: myColorIdx, kills: 0, deaths: 0 });
+  players.set(myId, { id: myId, name: myName, colorIdx: myColorIdx, skin: store.skin, kills: 0, deaths: 0 });
   updateScoreboard();
   menuEl.classList.add('hidden');
   menuHint.classList.add('hidden');
@@ -984,6 +1040,8 @@ function leaveMatch() {
   menuEl.classList.remove('hidden');
   menuHint.classList.remove('hidden');
   setMenuStatus('');
+  SFX.setMusicVolume(store.music);
+  SFX.startMusic();
 }
 
 // ---------------------------------------------------------------- menu wiring
@@ -993,7 +1051,10 @@ $('sensInput').value = store.sens;
 $('sensVal').textContent = store.sens.toFixed(1);
 $('volInput').value = store.vol * 100;
 $('volVal').textContent = Math.round(store.vol * 100) + '%';
+$('musInput').value = store.music * 100;
+$('musVal').textContent = Math.round(store.music * 100) + '%';
 SFX.volume = store.vol;
+SFX.musicVolume = store.music;
 
 $('sensInput').addEventListener('input', (e) => {
   store.sens = parseFloat(e.target.value);
@@ -1004,6 +1065,155 @@ $('volInput').addEventListener('input', (e) => {
   $('volVal').textContent = e.target.value + '%';
   SFX.setVolume(store.vol);
 });
+$('musInput').addEventListener('input', (e) => {
+  store.music = parseInt(e.target.value) / 100;
+  $('musVal').textContent = e.target.value + '%';
+  SFX.setMusicVolume(store.music);
+});
+
+// ---- tabs
+document.querySelectorAll('.tabbtn').forEach(b => b.addEventListener('click', () => {
+  SFX.uiClick();
+  document.querySelectorAll('.tabbtn').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('.tabpage').forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + b.dataset.tab));
+}));
+
+// ---- menu themes
+const THEMES = {
+  gold: { label: 'Desert Gold', gold: '#e8b44a', dim: '#a8823a', a: '232,180,74' },
+  night: { label: 'Night Ops', gold: '#84d65c', dim: '#4f8a3a', a: '132,214,92' },
+  crimson: { label: 'Crimson', gold: '#e2604a', dim: '#9a3a2e', a: '226,96,74' },
+  arctic: { label: 'Arctic', gold: '#7fc9e8', dim: '#4a7f9a', a: '127,201,232' },
+  nightfall: { label: 'Nightfall', gold: '#b48be8', dim: '#7a5aa8', a: '180,139,232' },
+};
+function applyTheme(key) {
+  const t = THEMES[key] || THEMES.gold;
+  const r = document.documentElement.style;
+  r.setProperty('--gold', t.gold);
+  r.setProperty('--gold-dim', t.dim);
+  r.setProperty('--goldA', t.a);
+  store.theme = key;
+  renderThemeRow();
+}
+function renderThemeRow() {
+  const row = $('themeRow');
+  row.innerHTML = '';
+  for (const [k, t] of Object.entries(THEMES)) {
+    const s = document.createElement('button');
+    s.className = 'swatch' + (store.theme === k ? ' sel' : '');
+    s.style.background = `linear-gradient(135deg, ${t.gold} 50%, ${t.dim} 50%)`;
+    s.innerHTML = `<small>${t.label}</small>`;
+    s.addEventListener('click', () => { SFX.uiClick(); applyTheme(k); });
+    row.appendChild(s);
+  }
+}
+
+// ---- loadout: rifle finish
+function renderFinishRow() {
+  const row = $('finishRow');
+  row.innerHTML = '';
+  RIFLE_FINISHES.forEach((f, i) => {
+    const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+    const s = document.createElement('button');
+    s.className = 'swatch' + (store.skin === i ? ' sel' : '');
+    s.style.background = `linear-gradient(135deg, ${hex(f.metal)} 55%, ${hex(f.wood)} 55%)`;
+    s.innerHTML = `<small>${f.name}</small>`;
+    s.addEventListener('click', () => {
+      SFX.uiClick();
+      store.skin = i;
+      mountViewRifle(i);
+      renderFinishRow();
+    });
+    row.appendChild(s);
+  });
+}
+
+// ---- loadout: reticle
+const RET_STYLES = [['cross', 'CROSSHAIR'], ['dot', 'FINE DOT'], ['post', 'T-POST']];
+const RET_COLORS = [['#e02020', 'Red'], ['#ffb840', 'Amber'], ['#39e05c', 'Green'], ['#3fd4e8', 'Cyan']];
+function applyReticle() {
+  const sc = $('scope');
+  sc.classList.remove('ret-dot', 'ret-post');
+  if (store.reticle !== 'cross') sc.classList.add('ret-' + store.reticle);
+  sc.style.setProperty('--ret', store.retColor);
+}
+function renderReticleRows() {
+  const row = $('reticleRow');
+  row.innerHTML = '';
+  for (const [k, label] of RET_STYLES) {
+    const b = document.createElement('button');
+    b.className = 'optbtn' + (store.reticle === k ? ' sel' : '');
+    b.textContent = label;
+    b.addEventListener('click', () => { SFX.uiClick(); store.reticle = k; applyReticle(); renderReticleRows(); });
+    row.appendChild(b);
+  }
+  const crow = $('retColorRow');
+  crow.innerHTML = '';
+  for (const [c, label] of RET_COLORS) {
+    const s = document.createElement('button');
+    s.className = 'swatch' + (store.retColor === c ? ' sel' : '');
+    s.style.background = c;
+    s.innerHTML = `<small>${label}</small>`;
+    s.addEventListener('click', () => { SFX.uiClick(); store.retColor = c; applyReticle(); renderReticleRows(); });
+    crow.appendChild(s);
+  }
+}
+
+// ---- controls: keybinds
+function renderBinds() {
+  const list = $('bindList');
+  list.innerHTML = '';
+  for (const [action, label] of BIND_ACTIONS) {
+    const row = document.createElement('div');
+    row.className = 'bindrow';
+    const bl = document.createElement('span');
+    bl.className = 'bl';
+    bl.textContent = label;
+    const btn = document.createElement('button');
+    btn.className = 'keybtn' + (bindListening === action ? ' listening' : '');
+    btn.textContent = bindListening === action ? 'PRESS KEY…' : prettyKey(binds[action]);
+    btn.addEventListener('click', () => {
+      SFX.uiClick();
+      bindListening = bindListening === action ? null : action;
+      renderBinds();
+    });
+    row.appendChild(bl);
+    row.appendChild(btn);
+    list.appendChild(row);
+  }
+}
+$('resetBinds').addEventListener('click', () => {
+  SFX.uiClick();
+  binds = { ...DEFAULT_BINDS };
+  store.binds = binds;
+  bindListening = null;
+  renderBinds();
+  updateHint();
+});
+
+function updateHint() {
+  const k = (a) => prettyKey(binds[a]);
+  $('menuHint').innerHTML =
+    `<b>${k('forward')}${k('left')}${k('back')}${k('right')}</b> move &nbsp;·&nbsp; <b>RMB</b> scope &nbsp;·&nbsp; <b>LMB</b> fire ` +
+    `&nbsp;·&nbsp; <b>${k('sprint')}</b> sprint / breath &nbsp;·&nbsp; <b>${k('reload')}</b> reload &nbsp;·&nbsp; ` +
+    `<b>${k('crouch')}</b> crouch &nbsp;·&nbsp; <b>${k('jump')}</b> jump`;
+}
+
+// ---- menu music: needs a user gesture before audio can start
+document.addEventListener('pointerdown', () => {
+  if (mode === 'menu') {
+    SFX.init();
+    SFX.setVolume(store.vol);
+    SFX.startMusic();
+  }
+});
+
+applyTheme(store.theme);
+renderFinishRow();
+renderReticleRows();
+applyReticle();
+renderBinds();
+updateHint();
 
 function setMenuStatus(msg, isErr) {
   const el = $('menuStatus');
@@ -1061,13 +1271,13 @@ $('joinBtn').addEventListener('click', async () => {
           for (const p of msg.roster) {
             if (p.id === myId) continue;
             players.set(p.id, { ...p });
-            createRemote(p.id, p.name, p.colorIdx);
+            createRemote(p.id, p.name, p.colorIdx, p.skin);
           }
           updateScoreboard();
           resolve();
         } else orig(msg, from);
       };
-      net.send({ t: 'hello', name: myName });
+      net.send({ t: 'hello', name: myName, skin: store.skin });
     });
     // ping loop
     setInterval(() => { if (net && !net.isHost) net.send({ t: 'ping', ts: performance.now() }); }, 2000);
@@ -1100,21 +1310,32 @@ if (location.hash && location.hash.length === 6) codeInput.value = location.hash
 
 // ---------------------------------------------------------------- input
 document.addEventListener('keydown', (e) => {
+  if (bindListening) { // capturing a new keybind from the controls tab
+    e.preventDefault();
+    if (e.code !== 'Escape') {
+      binds[bindListening] = e.code;
+      store.binds = binds;
+    }
+    bindListening = null;
+    renderBinds();
+    updateHint();
+    return;
+  }
   keys[e.code] = true;
   if (mode !== 'playing') return;
-  if (e.code === 'Tab') { e.preventDefault(); $('scoreboard').style.display = 'block'; }
+  if (e.code === binds.scoreboard) { e.preventDefault(); $('scoreboard').style.display = 'block'; }
   if (e.repeat) return;
-  if (e.code === 'KeyR') startReload();
-  if (e.code === 'KeyC') player.crouch = !player.crouch;
-  if (e.code === 'ShiftLeft' && player.scoped && player.breath > 0.1) {
+  if (e.code === binds.reload) startReload();
+  if (e.code === binds.crouch) player.crouch = !player.crouch;
+  if (e.code === binds.sprint && player.scoped && player.breath > 0.1) {
     player.holdingBreath = true;
     SFX.breathIn();
   }
 });
 document.addEventListener('keyup', (e) => {
   keys[e.code] = false;
-  if (e.code === 'Tab') $('scoreboard').style.display = 'none';
-  if (e.code === 'ShiftLeft') player.holdingBreath = false;
+  if (e.code === binds.scoreboard) $('scoreboard').style.display = 'none';
+  if (e.code === binds.sprint) player.holdingBreath = false;
 });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 

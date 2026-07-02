@@ -219,12 +219,8 @@ export function buildMap(scene) {
 
   buildings.forEach(([bx, bz, w, d, h, stairSide, hasAwning], bi) => {
     const mat = stuccoMats[bi % stuccoMats.length];
-    // walls
-    const walls = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    walls.position.set(bx, h / 2, bz);
-    walls.castShadow = true; walls.receiveShadow = true;
-    scene.add(walls);
-    addCollider(bx, 0, bz, w, h, d);
+    const T = 0.34;                 // wall thickness — buildings are hollow and enterable
+    const DOOR_W = 1.7, DOOR_H = 2.5;
 
     // door faces the map center (larger offset axis)
     let doorSide;
@@ -245,31 +241,74 @@ export function buildMap(scene) {
       return [bx + nx * (w / 2 + out), y, bz + along];
     };
 
-    // windows on every face
+    // hollow shell: 4 walls (door wall gets a real opening) + roof slab, merged into one mesh
+    const parts = [];
+    const wallPiece = (side, alongCenter, alongLen, y0, y1) => {
+      const { nx, nz } = sideInfo(side);
+      const cy = (y0 + y1) / 2, sy = y1 - y0;
+      let px, pz, sx, sz2;
+      if (nz !== 0) { px = alongCenter; pz = nz * (d / 2 - T / 2); sx = alongLen; sz2 = T; }
+      else { px = nx * (w / 2 - T / 2); pz = alongCenter; sx = T; sz2 = alongLen; }
+      parts.push({ geo: new THREE.BoxGeometry(sx, sy, sz2), matrix: new THREE.Matrix4().makeTranslation(px, cy, pz) });
+      addCollider(bx + px, y0, bz + pz, sx, sy, sz2);
+    };
+    for (const side of ['N', 'S', 'E', 'W']) {
+      const { len } = sideInfo(side);
+      if (side === doorSide) {
+        const segW = (len - DOOR_W) / 2;
+        wallPiece(side, -(DOOR_W / 2 + segW / 2), segW, 0, h);
+        wallPiece(side, (DOOR_W / 2 + segW / 2), segW, 0, h);
+        wallPiece(side, 0, DOOR_W, DOOR_H, h);   // lintel over the doorway
+      } else {
+        wallPiece(side, 0, len, 0, h);
+      }
+    }
+    // roof slab — walkable up top, ceiling inside
+    parts.push({ geo: new THREE.BoxGeometry(w, T, d), matrix: new THREE.Matrix4().makeTranslation(0, h - T / 2, 0) });
+    addCollider(bx, h - T, bz, w, T, d);
+    const shell = new THREE.Mesh(mergeGeoms(parts), mat);
+    shell.position.set(bx, 0, bz);
+    shell.castShadow = true; shell.receiveShadow = true;
+    scene.add(shell);
+
+    // interior cover
+    setCratesD.add(bx + w / 4 - 0.4, 0.45, bz - d / 4 + 0.4, 0.9, 0.9, 0.9, 0.4);
+    addCollider(bx + w / 4 - 0.4, 0, bz - d / 4 + 0.4, 0.9, 0.9, 0.9);
+    if (w >= 10) {
+      setCrates.add(bx - w / 4, 0.4, bz + d / 4, 1.6, 0.8, 0.9, 0);
+      addCollider(bx - w / 4, 0, bz + d / 4, 1.6, 0.8, 0.9);
+    }
+
+    // windows: recessed dark pane + protruding sill and lintel strips.
+    // Depths are all distinct (pane +0.03, strips +0.12, wall 0) — no z-fighting.
     for (const side of ['N', 'S', 'E', 'W']) {
       const { nx, len } = sideInfo(side);
-      const flat = nx === 0; // window box thin on z if face is N/S
+      const flat = nx === 0; // pane thin on z if face is N/S
       const cols = Math.max(1, Math.floor(len / 4.2));
       const rows = [];
-      for (let y = 2.3; y < h - 1.0; y += 2.6) rows.push(y);
+      for (let y = 2.3; y < h - 1.2; y += 2.6) rows.push(y);
       for (const wy of rows) {
         for (let ci = 0; ci < cols; ci++) {
           const along = (ci - (cols - 1) / 2) * (len / cols) * 0.8;
-          if (side === doorSide && wy < 3 && Math.abs(along) < 1.6) continue; // door slot
-          const [px, py, pz] = facePos(side, along, wy, 0.03);
-          setFrames.add(px, py - 0.75, pz, flat ? 1.16 : 0.16, 1.5, flat ? 0.16 : 1.16);
-          const [qx, qy, qz] = facePos(side, along, wy, 0.06);
-          setWindows.add(qx, qy - 0.65, qz, flat ? 0.92 : 0.1, 1.3, flat ? 0.1 : 0.92);
+          if (side === doorSide && wy < 3.2 && Math.abs(along) < 1.8) continue; // door slot
+          const [qx, qy, qz] = facePos(side, along, wy - 0.65, -0.02);
+          setWindows.add(qx, qy, qz, flat ? 0.92 : 0.1, 1.3, flat ? 0.1 : 0.92);
+          const [ax, ay, az] = facePos(side, along, wy - 1.34, 0);
+          setFrames.add(ax, ay, az, flat ? 1.16 : 0.24, 0.09, flat ? 0.24 : 1.16); // sill
+          const [lx2, ly2, lz2] = facePos(side, along, wy + 0.04, 0);
+          setFrames.add(lx2, ly2, lz2, flat ? 1.16 : 0.24, 0.09, flat ? 0.24 : 1.16); // lintel
         }
       }
     }
-    // door + frame
+    // doorway frame strips
     {
       const flat = sideInfo(doorSide).nx === 0;
-      const [fx, fy, fz] = facePos(doorSide, 0, 0, 0.04);
-      setFrames.add(fx, fy + 1.35, fz, flat ? 1.9 : 0.2, 2.7, flat ? 0.2 : 1.9);
-      const [px2, py2, pz2] = facePos(doorSide, 0, 0, 0.08);
-      setWindows.add(px2, py2 + 1.15, pz2, flat ? 1.4 : 0.12, 2.3, flat ? 0.12 : 1.4);
+      for (const s of [-1, 1]) {
+        const [fx, fy, fz] = facePos(doorSide, s * (DOOR_W / 2 + 0.07), DOOR_H / 2, 0);
+        setFrames.add(fx, fy, fz, flat ? 0.14 : 0.24, DOOR_H + 0.1, flat ? 0.24 : 0.14);
+      }
+      const [tx2, ty2, tz2] = facePos(doorSide, 0, DOOR_H + 0.07, 0);
+      setFrames.add(tx2, ty2, tz2, flat ? DOOR_W + 0.42 : 0.24, 0.14, flat ? 0.24 : DOOR_W + 0.42);
       if (hasAwning) {
         const awn = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 2.0), awnMats[bi % 3]);
         const { nx, nz } = sideInfo(doorSide);
@@ -445,7 +484,8 @@ export function buildMap(scene) {
   }
 
   // ---------------------------------------------------------------- market stalls
-  const stallSpots = [[-9, -8, 0.4], [9, 8, -0.6], [-8, 10, 2.2], [10, -7, 1.4]];
+  // near-axis rotations only, so the axis-aligned colliders stay honest
+  const stallSpots = [[-9, -8, 0.12], [9, 8, -0.1], [-8, 10, 0.08], [10, -7, -0.14]];
   stallSpots.forEach(([sx, sz, ry], i) => {
     const g = new THREE.Group();
     g.position.set(sx, 0, sz); g.rotation.y = ry;
@@ -464,8 +504,7 @@ export function buildMap(scene) {
       new THREE.MeshStandardMaterial({ color: [0xc2703a, 0x88a04a, 0xb8402e][i % 3], roughness: 0.9 }));
     goods.position.set(0.6, 1.05, 0.2); goods.castShadow = true; g.add(goods);
     scene.add(g);
-    // approximate collider (table, unrotated approximation is fine at these angles)
-    addCollider(sx, 0, sz, 3.0, 0.9, 1.9);
+    addCollider(sx, 0, sz, 3.2, 0.9, 2.0);
   });
 
   // ---------------------------------------------------------------- crates / barrels / sandbags

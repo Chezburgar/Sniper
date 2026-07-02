@@ -19,6 +19,8 @@ peer-to-peer WebRTC networking (PeerJS), so it works from static hosting like Gi
 | Jump | `SPACE` |
 | Scoreboard | Hold `TAB` |
 
+All keys are fully rebindable in the **Controls** tab of the menu.
+
 - **Host Match** — opens a room and gives you a 5-letter code to share.
 - **Join Match** — enter a friend's code. You can also share a link like
   `https://chezburgar.github.io/Sniper/#CODE` to prefill it.
@@ -28,19 +30,29 @@ Damage is zone-based: headshots are lethal, chest and legs take multiple hits.
 The bolt cycles between shots — make the first one count. Holding breath steadies
 the scope for about 3 seconds.
 
+## Customization
+
+The **Loadout** tab lets you pick a rifle finish (Midnight, Desert Fang, Jungle
+Viper, Arctic Ghost, Gilded King — other players see your skin too), a reticle
+style (crosshair / fine dot / T-post) and reticle color. The **Settings** tab has
+sensitivity, separate SFX and music volumes, and five menu color themes. Everything
+persists between sessions.
+
 ## The map — "Al-Ramla"
 
 A sun-baked desert village at golden hour: a fountain plaza ringed by stucco houses,
 rooftop sniper nests with exterior staircases, a 16-metre climbable bell tower,
 walkable perimeter ramparts with corner bastions, market stalls, palms, and dunes
-rolling out to distant pyramids. Every rooftop with a parapet is reachable.
+rolling out to distant pyramids. Every rooftop with a parapet is reachable, and
+every house is enterable — real doorways, interior cover, and dirt floors.
 
 ## Tech
 
 - **Rendering:** Three.js — ACES tone mapping, PCF soft shadows, distance fog,
   procedurally generated canvas textures (stucco, cobblestone, sand, wood).
 - **Audio:** 100% synthesized WebAudio — rifle crack with echo slap-back, bolt cycling,
-  bullet whizzes, hitmarkers, desert wind ambience. No audio files.
+  bullet whizzes, hitmarkers, desert wind ambience, and a generative ambient menu
+  soundtrack (drone, pads, phrygian-dominant melody). No audio files.
 - **Netcode:** PeerJS (WebRTC data channels) in a host-relay star topology,
   with snapshot interpolation for remote players. Works on static hosting because
   the "server" is just the hosting player's browser.
