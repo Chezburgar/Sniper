@@ -23,7 +23,6 @@ class SfxEngine {
     this._noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this._noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    this._startWind();
   }
 
   setVolume(v) { this.volume = v; if (this.master) this.master.gain.value = v; }
@@ -337,22 +336,6 @@ class SfxEngine {
     this.musicGain = null;
   }
 
-  _startWind() { // desert ambience: filtered noise, slowly breathing
-    const t = this.ctx.currentTime;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this._noiseBuf; src.loop = true;
-    const f = this.ctx.createBiquadFilter();
-    f.type = 'bandpass'; f.frequency.value = 340; f.Q.value = 0.45;
-    const g = this.ctx.createGain(); g.gain.value = 0.045;
-    const lfo = this.ctx.createOscillator(); lfo.frequency.value = 0.09;
-    const lfoG = this.ctx.createGain(); lfoG.gain.value = 0.02;
-    lfo.connect(lfoG); lfoG.connect(g.gain);
-    const lfo2 = this.ctx.createOscillator(); lfo2.frequency.value = 0.05;
-    const lfo2G = this.ctx.createGain(); lfo2G.gain.value = 120;
-    lfo2.connect(lfo2G); lfo2G.connect(f.frequency);
-    src.connect(f); f.connect(g); g.connect(this.master);
-    src.start(t); lfo.start(t); lfo2.start(t);
-  }
 }
 
 export const SFX = new SfxEngine();

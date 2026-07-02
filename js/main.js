@@ -967,9 +967,11 @@ function updateBots(dt) {
           if (bot.cooldown <= 0 && bot.aimT > 1.4) {
             bot.cooldown = 2.8 + Math.random() * 2.5;
             bot.aimT = 0;
-            // fire!
-            const miss = new THREE.Vector3().randomDirection().multiplyScalar(Math.random() * 2.2);
+            // fire! accuracy falls off with range but bots land real hits now
+            const err = 0.35 + Math.random() * (0.4 + dist * 0.014);
+            const miss = new THREE.Vector3().randomDirection().multiplyScalar(err);
             const aimPoint = camera.position.clone().add(miss);
+            aimPoint.y -= 0.35; // aim center mass, not the eyes
             const fireDir = aimPoint.sub(eye).normalize();
             const from = new THREE.Vector3();
             bot.refs.muzzle.getWorldPosition(from);

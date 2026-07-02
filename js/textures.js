@@ -232,6 +232,31 @@ export function frondTexture(rnd) {
   return tex;
 }
 
+// ---- Window glass (dark panes + mullions + sky sheen, so windows don't read as holes) ----
+export function windowTexture(rnd) {
+  const S = 128, [c, ctx] = canvas(S);
+  ctx.fillStyle = '#232b33'; ctx.fillRect(0, 0, S, S);
+  // diagonal sky reflection streak
+  const g = ctx.createLinearGradient(0, 0, S, S);
+  g.addColorStop(0, 'rgba(140,170,200,0.35)');
+  g.addColorStop(0.35, 'rgba(140,170,200,0.05)');
+  g.addColorStop(0.55, 'rgba(90,120,150,0.22)');
+  g.addColorStop(0.7, 'rgba(90,120,150,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+  // pane shading per quadrant
+  for (const [qx, qy] of [[0, 0], [S / 2, 0], [0, S / 2], [S / 2, S / 2]]) {
+    ctx.fillStyle = `rgba(10,14,18,${0.12 + rnd() * 0.18})`;
+    ctx.fillRect(qx, qy, S / 2, S / 2);
+  }
+  // mullion cross + outer frame
+  ctx.fillStyle = '#4a4234';
+  ctx.fillRect(S / 2 - 3, 0, 6, S);
+  ctx.fillRect(0, S / 2 - 3, S, 6);
+  ctx.strokeStyle = '#4a4234'; ctx.lineWidth = 8;
+  ctx.strokeRect(0, 0, S, S);
+  return finish(c);
+}
+
 // ---- Water (fountain) ----
 export function waterTexture(rnd) {
   const S = 256, [c, ctx] = canvas(S);

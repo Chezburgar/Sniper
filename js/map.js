@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import {
   mulberry32, sandTexture, cobbleTexture, stuccoTexture, stoneTexture, woodTexture,
-  awningTexture, rockTexture, frondTexture, waterTexture, sandbagTexture, metalTexture
+  awningTexture, rockTexture, frondTexture, waterTexture, sandbagTexture, metalTexture,
+  windowTexture
 } from './textures.js';
 
 const rnd = mulberry32(1337);
@@ -80,7 +81,10 @@ export function buildMap(scene) {
   const matRock = new THREE.MeshStandardMaterial({ map: texRock, roughness: 1 });
   const matSandbag = new THREE.MeshStandardMaterial({ map: texSandbag, roughness: 1 });
   const matMetal = new THREE.MeshStandardMaterial({ map: texMetal, roughness: 0.55, metalness: 0.55 });
-  const matDark = new THREE.MeshStandardMaterial({ color: 0x17130d, roughness: 0.9 });
+  const matWindow = new THREE.MeshStandardMaterial({
+    map: windowTexture(rnd), roughness: 0.35, metalness: 0.25,
+    emissive: 0x0e1218, emissiveIntensity: 0.35
+  });
   const matFrame = new THREE.MeshStandardMaterial({ color: 0xcbb28e, roughness: 0.9 });
   const matWater = new THREE.MeshStandardMaterial({
     map: texWater, roughness: 0.15, metalness: 0.1,
@@ -176,7 +180,7 @@ export function buildMap(scene) {
 
   // ---------------------------------------------------------------- instanced sets
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
-  const setWindows = new InstancedSet(unitBox, matDark);
+  const setWindows = new InstancedSet(unitBox, matWindow);
   const setFrames = new InstancedSet(unitBox, matFrame);
   const setSteps = new InstancedSet(unitBox, matStone);
   const setParapet = new InstancedSet(unitBox, stuccoMats[0]);
@@ -282,6 +286,7 @@ export function buildMap(scene) {
     // windows: recessed dark pane + protruding sill and lintel strips.
     // Depths are all distinct (pane +0.03, strips +0.12, wall 0) — no z-fighting.
     for (const side of ['N', 'S', 'E', 'W']) {
+      if (side === stairSide) continue; // the staircase owns that face
       const { nx, len } = sideInfo(side);
       const flat = nx === 0; // pane thin on z if face is N/S
       const cols = Math.max(1, Math.floor(len / 4.2));
@@ -670,8 +675,9 @@ export function buildMap(scene) {
   }
   const palmFrondGeo = mergeGeoms(frondParts);
 
-  const palmSpots = [[-14, -8], [14, 9], [-9, 15], [15, -13], [-6.5, -33], [6.5, 33],
-  [-33, -7], [33, 7], [-18, 38], [20, -37], [-45, 25], [47, -18]];
+  // kept clear of building footprints so crowns never poke through roofs
+  const palmSpots = [[-14, -8], [14, 9], [-9, 15], [15, -13], [-5, -35], [4.5, 36],
+  [-33, -7], [34, 2], [-23, 37], [21, -38], [-45, 25], [47, -18]];
   palmSpots.forEach(([x, z]) => {
     const ry = rnd() * Math.PI * 2;
     const trunk = new THREE.Mesh(palmTrunkGeo, barkMat);
