@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LONGSHOT — Online Sniper PvP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='none' stroke='%23e8b44a' stroke-width='6'/><line x1='50' y1='6' x2='50' y2='94' stroke='%23e8b44a' stroke-width='5'/><line x1='6' y1='50' x2='94' y2='50' stroke='%23e8b44a' stroke-width='5'/></svg>">
+<style>
+:root{
+  --gold:#e8b44a; --gold-dim:#a8823a; --ink:#0c0f12; --panel:rgba(10,13,16,.82);
+  --red:#e2493b; --green:#7fc95c; --text:#e8e2d4;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0c0f12;font-family:'Rajdhani',sans-serif;color:var(--text);-webkit-user-select:none;user-select:none}
+canvas#game{position:fixed;inset:0;display:block}
+.hidden{display:none!important}
+
+/* ============ MENU ============ */
+#menu{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,rgba(8,10,13,.45),rgba(8,10,13,.72) 70%,rgba(8,10,13,.92));}
+#menu .panel{width:min(430px,92vw);background:var(--panel);border:1px solid rgba(232,180,74,.35);
+  border-radius:10px;padding:34px 38px;backdrop-filter:blur(10px);box-shadow:0 30px 80px rgba(0,0,0,.6)}
+h1{font-family:'Chakra Petch',sans-serif;font-size:44px;letter-spacing:8px;color:var(--gold);
+  text-align:center;text-shadow:0 0 30px rgba(232,180,74,.35);line-height:1}
+.sub{ text-align:center;font-size:14px;letter-spacing:5px;color:#9a927e;margin:6px 0 26px;text-transform:uppercase}
+label{display:block;font-size:12px;letter-spacing:2.5px;color:#9a927e;text-transform:uppercase;margin:14px 0 5px}
+input[type=text]{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(232,180,74,.25);border-radius:6px;
+  color:var(--text);font-family:'Chakra Petch';font-size:17px;letter-spacing:2px;padding:10px 13px;outline:none;text-transform:uppercase}
+input[type=text]:focus{border-color:var(--gold)}
+input[type=range]{width:100%;accent-color:var(--gold)}
+.btn{display:block;width:100%;margin-top:12px;padding:13px;border-radius:6px;border:1px solid var(--gold-dim);
+  background:linear-gradient(180deg,rgba(232,180,74,.16),rgba(232,180,74,.05));color:var(--gold);
+  font-family:'Chakra Petch';font-size:16px;letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:.15s}
+.btn:hover{background:linear-gradient(180deg,rgba(232,180,74,.34),rgba(232,180,74,.12));box-shadow:0 0 22px rgba(232,180,74,.25)}
+.btn.primary{background:linear-gradient(180deg,#e8b44a,#c2903a);color:#191204;font-weight:700}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.ghost{border-color:rgba(255,255,255,.18);color:#c8c2b2}
+.row{display:flex;gap:10px}
+.row .btn{margin-top:12px}
+.row input{margin-top:12px}
+#menuStatus{margin-top:14px;text-align:center;font-size:14px;letter-spacing:1px;color:#9a927e;min-height:18px}
+#menuStatus.err{color:var(--red)}
+.settings{margin-top:18px;border-top:1px solid rgba(255,255,255,.09);padding-top:6px;display:flex;gap:18px}
+.settings>div{flex:1}
+.controls-hint{position:fixed;bottom:22px;left:0;right:0;text-align:center;font-size:13px;letter-spacing:2px;color:#8d8674;z-index:41}
+.controls-hint b{color:var(--gold)}
+.credit{position:fixed;top:18px;right:22px;font-size:12px;letter-spacing:2px;color:#6d675a;z-index:41}
+
+/* ============ HUD ============ */
+#hud{position:fixed;inset:0;z-index:20;pointer-events:none}
+#crosshair{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;
+  background:rgba(255,255,255,.85);box-shadow:0 0 4px rgba(0,0,0,.8)}
+#hitmarker{position:fixed;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;opacity:0;pointer-events:none}
+#hitmarker span{position:absolute;width:15px;height:2.5px;background:#fff;box-shadow:0 0 4px #000}
+#hitmarker span:nth-child(1){left:0;top:6px;transform:rotate(45deg)}
+#hitmarker span:nth-child(2){right:0;top:6px;transform:rotate(-45deg)}
+#hitmarker span:nth-child(3){left:0;bottom:6px;transform:rotate(-45deg)}
+#hitmarker span:nth-child(4){right:0;bottom:6px;transform:rotate(45deg)}
+#hitmarker.head span{background:#ffcf3f}
+#hitmarker.show{animation:hitpop .28s ease-out}
+@keyframes hitpop{0%{opacity:1;transform:scale(.7)}100%{opacity:0;transform:scale(1.25)}}
+
+#healthwrap{position:fixed;left:30px;bottom:28px;width:250px}
+#healthlabel{font-size:13px;letter-spacing:3px;color:#b7b09d;margin-bottom:5px;display:flex;justify-content:space-between}
+#healthbar{height:10px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.22);border-radius:4px;overflow:hidden}
+#healthfill{height:100%;width:100%;background:linear-gradient(90deg,#8fce62,#c8e25b);transition:width .18s,background .18s;border-radius:3px}
+#ammowrap{position:fixed;right:34px;bottom:24px;text-align:right;font-family:'Chakra Petch'}
+#ammoBig{font-size:48px;font-weight:700;color:var(--text);line-height:1;text-shadow:0 2px 8px rgba(0,0,0,.7)}
+#ammoBig small{font-size:20px;color:#9a927e}
+#weaponName{font-size:13px;letter-spacing:3px;color:#9a927e;text-transform:uppercase}
+#reloadHint{font-size:14px;letter-spacing:2px;color:var(--gold);height:18px}
+
+#killfeed{position:fixed;top:22px;right:24px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.kf{background:rgba(8,10,13,.72);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:5px 12px;
+  font-size:14.5px;letter-spacing:.5px;animation:kfin .25s ease-out}
+.kf .k{color:var(--gold);font-weight:700}.kf .v{color:#d0cabb;font-weight:700}.kf .hs{color:#ffcf3f}
+.kf.me{border-color:rgba(232,180,74,.55)}
+@keyframes kfin{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+
+#roomChip{position:fixed;top:22px;left:24px;background:rgba(8,10,13,.72);border:1px solid rgba(232,180,74,.4);
+  border-radius:6px;padding:7px 14px;font-size:14px;letter-spacing:2px;color:#b7b09d;pointer-events:auto;cursor:pointer}
+#roomChip b{color:var(--gold);font-family:'Chakra Petch';font-size:16px}
+#pingChip{position:fixed;top:64px;left:24px;font-size:12.5px;letter-spacing:2px;color:#7d7767}
+
+#centerMsg{position:fixed;left:0;right:0;top:26%;text-align:center;font-family:'Chakra Petch';font-size:26px;
+  letter-spacing:4px;color:var(--gold);text-shadow:0 2px 14px rgba(0,0,0,.8)}
+#subMsg{position:fixed;left:0;right:0;top:calc(26% + 40px);text-align:center;font-size:16px;letter-spacing:2px;color:#c8c2b2}
+
+#scope{position:fixed;inset:0;display:none;pointer-events:none}
+#scope .mask{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 0,transparent 36vmin,rgba(2,3,4,.99) 38.5vmin)}
+#scope .ringA{position:absolute;left:50%;top:50%;width:73vmin;height:73vmin;transform:translate(-50%,-50%);
+  border-radius:50%;border:1.2vmin solid #05070a;box-shadow:inset 0 0 6vmin rgba(0,0,0,.9)}
+#scope .hl,#scope .vl{position:absolute;background:rgba(10,12,10,.92)}
+#scope .hl{left:calc(50% - 36vmin);top:calc(50% - .75px);width:72vmin;height:1.5px}
+#scope .vl{top:calc(50% - 36vmin);left:calc(50% - .75px);height:72vmin;width:1.5px}
+#scope .dotc{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:rgba(200,30,30,.9);box-shadow:0 0 6px rgba(200,30,30,.6)}
+#scope .mil{position:absolute;left:50%;top:calc(50% + 6vmin);width:1.5px;height:14vmin;transform:translateX(-50%);
+  background:repeating-linear-gradient(180deg,rgba(10,12,10,.9) 0 1.5px,transparent 1.5px 3.5vmin)}
+#breath{position:fixed;left:50%;bottom:12%;transform:translateX(-50%);font-size:13px;letter-spacing:3px;color:rgba(232,226,212,.75);display:none}
+
+#vignette{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .12s;
+  background:radial-gradient(circle at 50% 50%,transparent 42%,rgba(190,20,10,.5) 100%)}
+#deathScreen{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;flex-direction:column;
+  background:radial-gradient(circle at 50% 45%,rgba(60,4,2,.35),rgba(8,4,4,.82))}
+#deathScreen h2{font-family:'Chakra Petch';font-size:44px;letter-spacing:8px;color:var(--red);text-shadow:0 0 30px rgba(226,73,59,.4)}
+#deathBy{margin-top:10px;font-size:18px;letter-spacing:2px;color:#cdb9ae}
+#respawnIn{margin-top:26px;font-family:'Chakra Petch';font-size:22px;letter-spacing:3px;color:var(--text)}
+
+#scoreboard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);min-width:460px;display:none;
+  background:rgba(8,10,13,.88);border:1px solid rgba(232,180,74,.4);border-radius:10px;padding:22px 26px;backdrop-filter:blur(6px)}
+#scoreboard h3{font-family:'Chakra Petch';letter-spacing:4px;color:var(--gold);font-size:19px;margin-bottom:12px;text-align:center}
+#scoreboard table{width:100%;border-collapse:collapse;font-size:16px}
+#scoreboard th{font-size:12px;letter-spacing:2px;color:#9a927e;text-align:left;padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.12)}
+#scoreboard td{padding:6px 10px;letter-spacing:.5px}
+#scoreboard tr.me td{color:var(--gold)}
+#scoreboard td:nth-child(2),#scoreboard td:nth-child(3),#scoreboard th:nth-child(2),#scoreboard th:nth-child(3){text-align:center}
+
+#pauseOverlay{position:fixed;inset:0;z-index:35;display:none;align-items:center;justify-content:center;flex-direction:column;
+  background:rgba(6,8,10,.66);backdrop-filter:blur(4px)}
+#pauseOverlay h2{font-family:'Chakra Petch';font-size:30px;letter-spacing:6px;color:var(--gold)}
+#pauseOverlay p{margin-top:12px;font-size:16px;letter-spacing:1.5px;color:#c8c2b2}
+#pauseOverlay .btn{width:240px;pointer-events:auto}
+#toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(8,10,13,.85);border:1px solid rgba(232,180,74,.4);
+  border-radius:6px;padding:8px 18px;font-size:15px;letter-spacing:1px;color:var(--text);opacity:0;transition:opacity .25s}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="crosshair"></div>
+  <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
+  <div id="scope">
+    <div class="mask"></div><div class="ringA"></div>
+    <div class="hl"></div><div class="vl"></div><div class="mil"></div><div class="dotc"></div>
+  </div>
+  <div id="breath">HOLD [SHIFT] — STEADY AIM</div>
+  <div id="vignette"></div>
+  <div id="healthwrap">
+    <div id="healthlabel"><span>VITALS</span><span id="hpnum">100</span></div>
+    <div id="healthbar"><div id="healthfill"></div></div>
+  </div>
+  <div id="ammowrap">
+    <div id="reloadHint"></div>
+    <div id="ammoBig"><span id="magN">5</span><small> / <span id="resN">30</span></small></div>
+    <div id="weaponName">M40-A7 &middot; BOLT ACTION</div>
+  </div>
+  <div id="killfeed"></div>
+  <div id="roomChip" class="hidden">ROOM <b id="roomCode">—</b> <span style="opacity:.6;font-size:12px">(click to copy)</span></div>
+  <div id="pingChip"></div>
+  <div id="centerMsg"></div>
+  <div id="subMsg"></div>
+  <div id="scoreboard"><h3>SCOREBOARD</h3><table><thead><tr><th>OPERATIVE</th><th>KILLS</th><th>DEATHS</th></tr></thead><tbody id="scoreBody"></tbody></table></div>
+</div>
+
+<div id="deathScreen">
+  <h2>ELIMINATED</h2>
+  <div id="deathBy"></div>
+  <div id="respawnIn"></div>
+</div>
+
+<div id="pauseOverlay">
+  <h2>PAUSED</h2>
+  <p>Click below to return to the fight &middot; TAB scoreboard &middot; ESC release cursor</p>
+  <button class="btn primary" id="resumeBtn" style="margin-top:22px">RESUME</button>
+  <button class="btn ghost" id="leaveBtn">LEAVE MATCH</button>
+</div>
+
+<!-- MAIN MENU -->
+<div id="menu">
+  <div class="panel">
+    <h1>LONGSHOT</h1>
+    <div class="sub">online sniper duels</div>
+    <label>Callsign</label>
+    <input type="text" id="nameInput" maxlength="14" placeholder="GHOST-1" autocomplete="off">
+    <button class="btn primary" id="hostBtn">HOST MATCH</button>
+    <div class="row">
+      <input type="text" id="codeInput" maxlength="5" placeholder="CODE" style="flex:1" autocomplete="off">
+      <button class="btn" id="joinBtn" style="flex:1.4">JOIN MATCH</button>
+    </div>
+    <button class="btn ghost" id="practiceBtn">PRACTICE RANGE (VS BOTS)</button>
+    <div class="settings">
+      <div><label>Sensitivity <span id="sensVal">1.0</span></label><input type="range" id="sensInput" min="0.2" max="3" step="0.1" value="1"></div>
+      <div><label>Volume <span id="volVal">80%</span></label><input type="range" id="volInput" min="0" max="100" step="5" value="80"></div>
+    </div>
+    <div id="menuStatus"></div>
+  </div>
+</div>
+<div class="controls-hint" id="menuHint"><b>WASD</b> move &nbsp;·&nbsp; <b>RMB</b> scope &nbsp;·&nbsp; <b>LMB</b> fire &nbsp;·&nbsp; <b>SHIFT</b> hold breath / sprint &nbsp;·&nbsp; <b>R</b> reload &nbsp;·&nbsp; <b>C</b> crouch &nbsp;·&nbsp; <b>SPACE</b> jump</div>
+<div class="credit">LONGSHOT v1.0</div>
+<div id="toast"></div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
