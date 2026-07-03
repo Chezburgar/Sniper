@@ -55,11 +55,16 @@ every house is enterable — real doorways, interior cover, and dirt floors.
   soundtrack (drone, pads, phrygian-dominant melody). No audio files.
 - **Netcode:** PeerJS (WebRTC data channels) in a host-relay star topology,
   with snapshot interpolation for remote players. Works on static hosting because
-  the "server" is just the hosting player's browser.
+  the "server" is just the hosting player's browser. STUN plus a TURN relay
+  fallback (see [`js/rtcconfig.js`](js/rtcconfig.js)) so matches still form across
+  strict/symmetric NATs.
 - **Zero build step:** plain ES modules + CDN imports.
 
-> Note: connections use the free public PeerJS broker and STUN only. On rare
-> symmetric-NAT networks a peer may fail to connect — try a different network if so.
+> Note: connections use the free public PeerJS broker for signaling and a
+> best-effort free TURN relay for the fallback path. For reliable matches on
+> locked-down networks, drop your own TURN credentials into
+> [`js/rtcconfig.js`](js/rtcconfig.js) (or set `localStorage.ls_turn` at runtime) —
+> Metered's free tier covers 500 MB/month.
 
 ## Run locally
 

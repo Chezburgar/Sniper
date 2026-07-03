@@ -164,6 +164,10 @@ function updateVfx(dt) {
 
 // ---------------------------------------------------------------- ray utils
 const _tmpV1 = new THREE.Vector3(), _tmpV2 = new THREE.Vector3(), _tmpV3 = new THREE.Vector3();
+// Dedicated bot-eye vector. MUST stay distinct from _tmpV1/_tmpV2 because rayBody()
+// and raySphere() reuse those internally — aliasing the ray origin to them makes
+// every body hit-test collapse to origin==center and silently return null.
+const _botEye = new THREE.Vector3();
 
 function rayAABB(origin, dir, box, maxDist) { // slab method -> t or null
   let tmin = 0, tmax = maxDist;
@@ -596,14 +600,17 @@ function pickSpawn() {
   const enemies = [];
   for (const r of remotes.values()) if (!r.dead && r.model.visible) enemies.push(r.model.position);
   for (const b of bots) if (!b.dead) enemies.push(b.pos);
-  let best = map.spawns[0], bestScore = -1;
-  for (const s of map.spawns) {
-    let minD = 1e9;
-    for (const e of enemies) minD = Math.min(minD, s.distanceTo(e));
-    const score = minD + Math.random() * 8;
-    if (score > bestScore) { bestScore = score; best = s; }
+  // Random spawn — re-rolled a few times only to avoid dropping in an enemy's lap.
+  const rand = () => map.spawns[Math.floor(Math.random() * map.spawns.length)];
+  let choice = rand();
+  for (let tries = 0; tries < 8; tries++) {
+    const s = rand();
+    choice = s;
+    let clear = true;
+    for (const e of enemies) { if (s.distanceTo(e) < 12) { clear = false; break; } }
+    if (clear) break;
   }
-  return best.clone();
+  return choice.clone();
 }
 
 // ---------------------------------------------------------------- movement & collision
@@ -953,39 +960,41 @@ function updateBots(dt) {
     if (moving && bot.speed < 0.4) { bot.target = null; bot.waitT = 0.2; } // stuck
 
     // engage the player
-    if (!player.dead) {
-      const eye = _tmpV2.set(bot.pos.x, bot.pos.y + 1.6, bot.pos.z);
+    if (!player.dead && time >= player.spawnProtT) {
+      const eye = _botEye.set(bot.pos.x, bot.pos.y + 1.6, bot.pos.z); // dedicated vector — see _botEye note
       _tmpV3.copy(camera.position).sub(eye);
       const dist = _tmpV3.length();
-      if (dist < 90) {
+      if (dist < 100) {
         const dir = _tmpV3.clone().normalize();
         const tW = rayWorld(eye, dir, dist - 0.5);
         if (tW === null) { // clear line of sight
           bot.yaw = Math.atan2(-dir.x, -dir.z);
           bot.aimT += dt;
           bot.cooldown -= dt;
-          if (bot.cooldown <= 0 && bot.aimT > 1.4) {
-            bot.cooldown = 2.8 + Math.random() * 2.5;
+          if (bot.cooldown <= 0 && bot.aimT > 0.9) {
+            bot.cooldown = 2.0 + Math.random() * 2.0;
             bot.aimT = 0;
-            // fire! accuracy falls off with range but bots land real hits now
-            const err = 0.35 + Math.random() * (0.4 + dist * 0.014);
+            // fire! accuracy falls off with range but bots now land real hits
+            const err = 0.22 + Math.random() * (0.28 + dist * 0.011);
             const miss = new THREE.Vector3().randomDirection().multiplyScalar(err);
             const aimPoint = camera.position.clone().add(miss);
-            aimPoint.y -= 0.35; // aim center mass, not the eyes
+            aimPoint.y -= 0.32; // aim center mass, not the eyes
             const fireDir = aimPoint.sub(eye).normalize();
             const from = new THREE.Vector3();
             bot.refs.muzzle.getWorldPosition(from);
-            const tHit = rayWorld(eye, fireDir, 300);
-            const hitMe = rayBody(eye, fireDir, player.pos, player.crouch, tHit !== null ? tHit : 300);
-            const end = eye.clone().addScaledVector(fireDir, hitMe ? hitMe.t : (tHit !== null ? tHit : 300));
+            // origin passed to rayBody must be a fresh vector (rayBody mutates _tmpV2 internally)
+            const shootOrigin = eye.clone();
+            const tHit = rayWorld(shootOrigin, fireDir, 300);
+            const hitMe = rayBody(shootOrigin, fireDir, player.pos, player.crouch, tHit !== null ? tHit : 300);
+            const end = shootOrigin.clone().addScaledVector(fireDir, hitMe ? hitMe.t : (tHit !== null ? tHit : 300));
             spawnTracer(from, end);
-            const a = audioAt(eye);
+            const a = audioAt(bot.pos);
             SFX.distantShot(Math.min(0.9, a.vol + 0.2), a.pan);
             if (hitMe) {
               receiveDamage(Math.round(DMG[hitMe.part] * 0.5), bot.id, hitMe.part);
               spawnBlood(end);
             } else {
-              SFX.whiz(0.6, 0);
+              SFX.whiz(0.55, 0);
               if (tHit !== null) spawnPuff(end, 1);
             }
           }

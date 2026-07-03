@@ -1,8 +1,14 @@
 // WebRTC networking via PeerJS (public broker) — works on static hosting.
 // Star topology: the host relays traffic between all clients.
 /* global Peer */
+import { iceServers } from './rtcconfig.js';
 
 const PREFIX = 'longshot-v1-';
+
+// PeerJS options shared by host and client, including STUN + TURN relay.
+function peerOpts() {
+  return { debug: 1, config: { iceServers: iceServers() } };
+}
 
 export function makeRoomCode() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -27,7 +33,7 @@ export class Net {
   hostGame(code) {
     return new Promise((resolve, reject) => {
       this.isHost = true;
-      const peer = new Peer(PREFIX + code, { debug: 1 });
+      const peer = new Peer(PREFIX + code, peerOpts());
       this.peer = peer;
       let settled = false;
       peer.on('open', () => { settled = true; resolve(code); });
@@ -57,7 +63,7 @@ export class Net {
   joinGame(code) {
     return new Promise((resolve, reject) => {
       this.isHost = false;
-      const peer = new Peer({ debug: 1 });
+      const peer = new Peer(peerOpts());
       this.peer = peer;
       let settled = false;
       const fail = (msg) => { if (!settled) { settled = true; reject(new Error(msg)); } };
