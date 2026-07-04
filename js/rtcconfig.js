@@ -21,9 +21,20 @@
 //   Clear with: localStorage.removeItem('ls_metered_sub'); localStorage.removeItem('ls_metered_key')
 
 export const METERED = {
-  subdomain: '',   // <-- your Metered App Name
-  apiKey: '',      // <-- your Metered Secret Key
+  subdomain: 'ggvault',                              // Metered App Name (ggvault.metered.live)
+  apiKey: '5c57bfbf44efd36a47a66a5241dda9428d0e',    // Metered credential API key
 };
+
+// ─── EASIEST: paste the Metered dashboard snippet here ────────────────────────
+// On dashboard.metered.ca open your app, find the ready-made "iceServers" code
+// block (it has a Copy button) and paste its entries between the brackets below.
+// If STATIC_ICE has any entries they're used directly — no live fetch, most robust.
+// It looks like:
+//   { urls: 'stun:stun.relay.metered.ca:80' },
+//   { urls: 'turn:global.relay.metered.ca:80', username: 'AAA', credential: 'BBB' },
+//   ...
+export const STATIC_ICE = [
+];
 
 // Static fallback used only when Metered isn't configured.
 export const DEFAULT_ICE = [
@@ -45,6 +56,7 @@ function meteredCreds() {
 }
 
 export function turnConfigured() {
+  if (STATIC_ICE.some(s => String(s.urls).startsWith('turn'))) return true;
   const { sub, key } = meteredCreds();
   return !!(sub && key);
 }
@@ -57,7 +69,13 @@ export async function iceServers() {
     if (Array.isArray(override) && override.length) return override;
   } catch (e) { /* malformed — ignore */ }
 
-  // 2) Metered dynamic credentials (the recommended path)
+  // 2) hard-coded dashboard snippet (most reliable)
+  if (STATIC_ICE.length) {
+    const hasStun = STATIC_ICE.some(s => String(s.urls).startsWith('stun'));
+    return hasStun ? STATIC_ICE : [{ urls: 'stun:stun.l.google.com:19302' }, ...STATIC_ICE];
+  }
+
+  // 3) Metered dynamic credentials (via API key)
   const { sub, key } = meteredCreds();
   if (sub && key) {
     try {
