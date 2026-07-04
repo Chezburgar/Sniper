@@ -28,7 +28,8 @@ All keys are fully rebindable in the **Controls** tab of the menu.
 
 Damage is zone-based: headshots are lethal, chest and legs take multiple hits.
 The bolt cycles between shots — make the first one count. Holding breath steadies
-the scope for about 3 seconds.
+the scope for about 3 seconds. Ammo reserves are unlimited — you still reload the
+5-round magazine, but you'll never run dry.
 
 ## Customization
 

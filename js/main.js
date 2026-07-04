@@ -63,7 +63,7 @@ const GRAV = 19, WALK = 4.6, SPRINT = 6.8, CROUCH_SPD = 2.1, SCOPED_SPD = 1.8;
 const JUMP = 6.4, EYE_STAND = 1.62, EYE_CROUCH = 1.12, RADIUS = 0.38;
 const H_STAND = 1.78, H_CROUCH = 1.24, STEP_UP = 0.55;
 const FOV = 75, SCOPE_FOV = 11;
-const MAG_SIZE = 5, RESERVE_START = 30;
+const MAG_SIZE = 5, RESERVE_START = Infinity; // infinite reserve — you still reload the mag, but never run dry
 const BOLT_TIME = 1.15, RELOAD_TIME = 2.65;
 const DMG = { head: 110, chest: 62, legs: 45 };
 const SEND_RATE = 0.08, INTERP_DELAY = 0.15;
@@ -366,7 +366,7 @@ function updateHud() {
   f.style.background = player.hp > 50 ? 'linear-gradient(90deg,#8fce62,#c8e25b)'
     : player.hp > 25 ? 'linear-gradient(90deg,#d8a43c,#e2c25b)' : 'linear-gradient(90deg,#c23b2e,#e2645b)';
   $('magN').textContent = player.mag;
-  $('resN').textContent = player.reserve;
+  $('resN').textContent = player.reserve === Infinity ? '∞' : player.reserve;
   $('reloadHint').textContent = player.reloadT > 0 ? 'RELOADING…'
     : (player.mag === 0 ? (player.reserve > 0 ? 'PRESS [R] TO RELOAD' : 'OUT OF AMMO') : (player.boltT > 0 ? 'CYCLING BOLT…' : ''));
   const dmgAge = time - player.lastDamageT;
